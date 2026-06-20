@@ -25,6 +25,7 @@ function now(): string {
 
 // LocalStorage helpers
 const STORAGE_KEY = 'bbt-app-data';
+const CLOUD_CONFIG_KEY = 'bbt-cloud-config';
 
 function saveToStorage(profile: UserProfile | null) {
   if (typeof window !== 'undefined') {
@@ -48,6 +49,26 @@ function loadFromStorage(): UserProfile | null {
     }
   }
   return null;
+}
+
+function loadCloudConfig(): { url: string; key: string } {
+  if (typeof window !== 'undefined') {
+    const data = localStorage.getItem(CLOUD_CONFIG_KEY);
+    if (data) {
+      try {
+        return JSON.parse(data);
+      } catch {
+        return { url: '', key: '' };
+      }
+    }
+  }
+  return { url: '', key: '' };
+}
+
+function saveCloudConfig(url: string, key: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify({ url, key }));
+  }
 }
 
 // Create blank test case
@@ -77,12 +98,22 @@ interface AppStore {
   currentProfile: UserProfile | null;
   isAuthenticated: boolean;
   currentView: AppView;
+  cloudServerUrl: string;
+  cloudApiKey: string;
   
   // Actions - Auth
   createNewUser: (name: string, email?: string, organization?: string) => void;
   importUserFromFile: (jsonString: string) => boolean;
   logout: () => void;
   updateProfile: (updates: Partial<Pick<UserProfile, 'name' | 'email' | 'organization'>>) => void;
+  
+  // Actions - Cloud
+  setCloudServerUrl: (url: string) => void;
+  setCloudApiKey: (key: string) => void;
+  uploadToCloud: (projectId: string) => Promise<{ success: boolean; message: string }>;
+  downloadFromCloud: (testId: string) => Promise<{ success: boolean; data?: any; message: string }>;
+  searchCloud: (query: string) => Promise<{ success: boolean; results?: any[]; message: string }>;
+  deleteFromCloud: (testId: string) => Promise<{ success: boolean; message: string }>;
   
   // Actions - Navigation
   navigate: (view: AppView) => void;
@@ -118,6 +149,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   currentProfile: null,
   isAuthenticated: false,
   currentView: { type: 'auth' },
+  cloudServerUrl: '',
+  cloudApiKey: '',
   
   // ===== AUTH =====
   createNewUser: (name, email, organization) => {
@@ -162,6 +195,129 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const updated = { ...currentProfile, ...updates, updatedAt: now() };
     set({ currentProfile: updated });
     saveToStorage(updated);
+  },
+  
+  // ===== CLOUD =====
+  setCloudServerUrl: (url) => {
+    const { cloudApiKey } = get();
+    set({ cloudServerUrl: url });
+    saveCloudConfig(url, cloudApiKey);
+  },
+  
+  setCloudApiKey: (key) => {
+    const { cloudServerUrl } = get();
+    set({ cloudApiKey: key });
+    saveCloudConfig(cloudServerUrl, key);
+  },
+  
+  uploadToCloud: async (projectId) => {
+    const { currentProfile, cloudServerUrl, cloudApiKey } = get();
+    if (!currentProfile) return { success: false, message: 'Tidak ada profile.' };
+    if (!cloudServerUrl) return { success: false, message: 'Cloud Server URL belum diatur.' };
+    
+    const project = currentProfile.projects.find(p => p.id === projectId);
+    if (!project) return { success: false, message: 'Project tidak ditemukan.' };
+    
+    const exportData = {
+      version: '1.0.0',
+      exportedAt: now(),
+      exportedBy: currentProfile.name,
+      isAnonymized: false,
+      project,
+    };
+    
+    try {
+      const response = await fetch(`${cloudServerUrl}/api/upload.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(cloudApiKey ? { 'X-API-Key': cloudApiKey } : {}),
+        },
+        body: JSON.stringify({
+          testId: project.testId,
+          data: exportData,
+        }),
+      });
+      
+      const result = await response.json();
+      return {
+        success: result.success === true,
+        message: result.message || result.error || 'Upload gagal.',
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Gagal terhubung ke server: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  },
+  
+  downloadFromCloud: async (testId) => {
+    const { cloudServerUrl } = get();
+    if (!cloudServerUrl) return { success: false, message: 'Cloud Server URL belum diatur.' };
+    
+    try {
+      const response = await fetch(`${cloudServerUrl}/api/download.php?id=${encodeURIComponent(testId)}`);
+      const result = await response.json();
+      
+      if (result.success === false || result.error) {
+        return { success: false, message: result.error || 'Project tidak ditemukan di cloud.' };
+      }
+      
+      return { success: true, data: result, message: 'Berhasil mengunduh dari cloud.' };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Gagal terhubung ke server: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  },
+  
+  searchCloud: async (query) => {
+    const { cloudServerUrl } = get();
+    if (!cloudServerUrl) return { success: false, message: 'Cloud Server URL belum diatur.' };
+    if (!query.trim()) return { success: true, results: [], message: '' };
+    
+    try {
+      const response = await fetch(`${cloudServerUrl}/api/search.php?q=${encodeURIComponent(query)}`);
+      const result = await response.json();
+      
+      return {
+        success: true,
+        results: result.results || [],
+        message: result.total > 0 ? `${result.total} ditemukan (cloud)` : 'Tidak ditemukan di cloud.',
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Gagal terhubung ke server: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  },
+  
+  deleteFromCloud: async (testId) => {
+    const { cloudServerUrl, cloudApiKey } = get();
+    if (!cloudServerUrl) return { success: false, message: 'Cloud Server URL belum diatur.' };
+    
+    try {
+      const response = await fetch(`${cloudServerUrl}/api/delete.php?id=${encodeURIComponent(testId)}`, {
+        method: 'POST',
+        headers: {
+          ...(cloudApiKey ? { 'X-API-Key': cloudApiKey } : {}),
+        },
+      });
+      const result = await response.json();
+      
+      return {
+        success: result.success === true,
+        message: result.message || result.error || 'Gagal menghapus.',
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Gagal terhubung ke server: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
   },
   
   // ===== NAVIGATION =====
@@ -618,11 +774,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // ===== HYDRATION =====
   hydrate: () => {
     const profile = loadFromStorage();
+    const cloudConfig = loadCloudConfig();
     if (profile) {
       set({ 
         currentProfile: profile, 
         isAuthenticated: true,
-        currentView: { type: 'dashboard' }
+        currentView: { type: 'dashboard' },
+        cloudServerUrl: cloudConfig.url,
+        cloudApiKey: cloudConfig.key,
+      });
+    } else {
+      set({
+        cloudServerUrl: cloudConfig.url,
+        cloudApiKey: cloudConfig.key,
       });
     }
   },

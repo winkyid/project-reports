@@ -11,19 +11,20 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Download, Upload, FileJson, Globe, User, Mail, Building,
-  Shield, FileDown, FileUp, Search 
+  Shield, FileDown, FileUp, Search, Cloud, CloudOff, Key, Loader2 
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SettingsPage() {
   const store = useAppStore();
   const profile = store.currentProfile;
-  const fileInputRef = useState<HTMLInputElement | null>(null);
-  const projectInputRef = useState<HTMLInputElement | null>(null);
   
   const [name, setName] = useState(profile?.name || '');
   const [email, setEmail] = useState(profile?.email || '');
   const [org, setOrg] = useState(profile?.organization || '');
+  const [serverUrl, setServerUrl] = useState(store.cloudServerUrl || '');
+  const [apiKey, setApiKey] = useState(store.cloudApiKey || '');
+  const [testing, setTesting] = useState(false);
   
   if (!profile) return null;
   
@@ -98,8 +99,9 @@ export function SettingsPage() {
       <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
       
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="cloud">Cloud</TabsTrigger>
           <TabsTrigger value="export">Export & Import</TabsTrigger>
           <TabsTrigger value="about">About</TabsTrigger>
         </TabsList>
@@ -178,6 +180,120 @@ export function SettingsPage() {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        {/* Cloud Tab */}
+        <TabsContent value="cloud" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Cloud className="w-4 h-4" />
+                Cloud Server Configuration
+              </CardTitle>
+              <CardDescription>
+                Hubungkan ke PHP gateway di InfinityFree untuk upload/download project JSON secara online.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cloud-url">Server URL</Label>
+                <Input
+                  id="cloud-url"
+                  placeholder="https://domain.com/bbt-gateway"
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  URL ke folder gateway PHP kamu (tanpa slash di akhir). Upload file <code className="bg-muted px-1 rounded">bbt-cloud-gateway.zip</code> ke hosting PHP.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cloud-key" className="flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5" />
+                  API Key
+                </Label>
+                <Input
+                  id="cloud-key"
+                  type="password"
+                  placeholder="API key dari config.php"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Samakan dengan <code className="bg-muted px-1 rounded">API_KEY</code> di file <code className="bg-muted px-1 rounded">config.php</code> gateway.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => {
+                  const url = serverUrl.trim().replace(/\/+$/, '');
+                  store.setCloudServerUrl(url);
+                  store.setCloudApiKey(apiKey.trim());
+                  toast.success('Konfigurasi cloud berhasil disimpan!');
+                }}>Simpan</Button>
+                <Button variant="outline" onClick={async () => {
+                  const url = serverUrl.trim().replace(/\/+$/, '');
+                  if (!url) { toast.error('Server URL kosong!'); return; }
+                  setTesting(true);
+                  try {
+                    const res = await fetch(`${url}/api/search.php?q=test`);
+                    const data = await res.json();
+                    if (data.success !== undefined) {
+                      store.setCloudServerUrl(url);
+                      store.setCloudApiKey(apiKey.trim());
+                      toast.success('Koneksi ke server berhasil!');
+                    } else {
+                      toast.error('Server merespon tapi format tidak dikenali.');
+                    }
+                  } catch {
+                    toast.error('Gagal terhubung ke server. Cek URL dan pastikan CORS diaktifkan.');
+                  } finally {
+                    setTesting(false);
+                  }
+                }} disabled={testing} className="gap-2">
+                  {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+                  Test Koneksi
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Cara Setup Cloud Gateway</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <ol className="list-decimal list-inside space-y-2">
+                <li>Download file <strong>bbt-cloud-gateway.zip</strong> dari folder download</li>
+                <li>Extract dan upload seluruh isi folder ke hosting PHP kamu (InfinityFree, dll)</li>
+                <li>Edit file <code className="bg-muted px-1 rounded">config.php</code> — ubah <code className="bg-muted px-1 rounded">API_KEY</code> dengan string random</li>
+                <li>Pastikan folder <code className="bg-muted px-1 rounded">data/</code> writable (chmod 755)</li>
+                <li>Masukkan URL gateway di atas (contoh: <code className="bg-muted px-1 rounded">https://domain.com/bbt-gateway</code>)</li>
+                <li>Isi API key yang sama dengan di config.php</li>
+                <li>Klik &quot;Test Koneksi&quot; untuk memastikan berjalan</li>
+              </ol>
+              <Separator />
+              <div className="flex items-start gap-2">
+                <Cloud className="w-4 h-4 mt-0.5 shrink-0" />
+                <p>Setelah terhubung, setiap project bisa di-upload ke cloud langsung dari halaman project detail. Hasilnya bisa dicari via Global Search.</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {store.cloudServerUrl && (
+            <Card className="border-green-200 dark:border-green-800">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2 text-green-700 dark:text-green-400">
+                  <Cloud className="w-4 h-4" />
+                  Server Terhubung
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Connected: <code className="bg-muted px-1 rounded font-mono text-xs">{store.cloudServerUrl}</code>
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
         
         {/* Export & Import Tab */}

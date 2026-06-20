@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { 
   Plus, FolderOpen, Trash2, MoreVertical, FileDown, Globe, 
-  Eye, ClipboardList, Calendar, User, Server, ExternalLink 
+  Eye, ClipboardList, Calendar, User, Server, ExternalLink, Cloud, CloudOff, Loader2 
 } from 'lucide-react';
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator 
@@ -31,9 +31,10 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 
 export function Dashboard() {
-  const { currentProfile, createProject, deleteProject, navigate, exportProject, generateHTMLReport } = useAppStore();
+  const { currentProfile, createProject, deleteProject, navigate, exportProject, generateHTMLReport, uploadToCloud, cloudServerUrl } = useAppStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   
   // Create project form state
   const [formName, setFormName] = useState('');
@@ -102,6 +103,21 @@ export function Dashboard() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Laporan HTML berhasil di-generate!');
+  };
+  
+  const handleCloudUpload = async (projectId: string) => {
+    if (!cloudServerUrl) {
+      toast.error('Cloud Server belum dikonfigurasi. Buka Settings > Cloud untuk setup.');
+      return;
+    }
+    setUploadingId(projectId);
+    const result = await uploadToCloud(projectId);
+    setUploadingId(null);
+    if (result.success) {
+      toast.success(result.message);
+    } else {
+      toast.error(result.message);
+    }
   };
   
   const getProjectStats = (project: Project) => {
@@ -267,6 +283,27 @@ export function Dashboard() {
                         <Globe className="mr-2 h-4 w-4" />
                         Generate HTML Report
                       </DropdownMenuItem>
+                      {cloudServerUrl && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleCloudUpload(project.id)}
+                            disabled={uploadingId === project.id}
+                          >
+                            {uploadingId === project.id 
+                              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                              : <Cloud className="mr-2 h-4 w-4" />
+                            }
+                            Upload ke Cloud
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            window.open(`${cloudServerUrl}/api/download.php?id=${project.testId}&format=html`, '_blank');
+                          }}>
+                            <Cloud className="mr-2 h-4 w-4" />
+                            Lihat di Cloud
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setShowDeleteDialog(project.id)}>
                         <Trash2 className="mr-2 h-4 w-4" />

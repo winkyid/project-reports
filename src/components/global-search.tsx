@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { 
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle 
 } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { 
   Search, ExternalLink, Download, Globe, X, 
-  ClipboardList, AlertCircle, CheckCircle2 
+  AlertCircle, Cloud, Loader2, CloudOff 
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,11 +21,14 @@ export function GlobalSearch() {
   const profile = store.currentProfile;
   const [query, setQuery] = useState('');
   const [selectedReport, setSelectedReport] = useState<{ html: string; name: string } | null>(null);
-  const fileInputRef = useState<HTMLInputElement | null>(null);
   
-  if (!profile) return null;
+  // Cloud search state
+  const [cloudResults, setCloudResults] = useState<any[]>([]);
+  const [cloudSearching, setCloudSearching] = useState(false);
+  const [cloudSearched, setCloudSearched] = useState(false);
+  const [cloudMessage, setCloudMessage] = useState('');
   
-  // Search in local projects
+  // Local search
   const localResults = query.trim()
     ? profile.projects.filter(p => 
         p.testId.toLowerCase().includes(query.toLowerCase()) ||
@@ -33,6 +37,40 @@ export function GlobalSearch() {
         p.testerName.toLowerCase().includes(query.toLowerCase())
       )
     : [];
+  
+  // Cloud search with debounce
+  useEffect(() => {
+    let cancelled = false;
+    
+    const doSearch = async () => {
+      if (!query.trim() || !store.cloudServerUrl) {
+        setCloudResults([]);
+        setCloudSearched(false);
+        return;
+      }
+      
+      setCloudSearching(true);
+      setCloudSearched(true);
+      const result = await store.searchCloud(query);
+      if (!cancelled) {
+        setCloudSearching(false);
+        if (result.success && result.results) {
+          setCloudResults(result.results);
+          setCloudMessage(result.message);
+        } else {
+          setCloudResults([]);
+          setCloudMessage(result.message);
+        }
+      }
+    };
+    
+    const timer = setTimeout(doSearch, 500);
+    
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, store.cloudServerUrl, store]);
   
   const handleUploadAndSearch = () => {
     const input = document.createElement('input');
@@ -44,7 +82,6 @@ export function GlobalSearch() {
       if (!file) return;
       
       if (file.name.endsWith('.html')) {
-        // Read HTML and extract test-id from meta tag
         const reader = new FileReader();
         reader.onload = (ev) => {
           const content = ev.target?.result as string;
@@ -58,7 +95,6 @@ export function GlobalSearch() {
         };
         reader.readAsText(file);
       } else if (file.name.endsWith('.json')) {
-        // Read JSON and extract testId
         const reader = new FileReader();
         reader.onload = (ev) => {
           try {
@@ -89,12 +125,17 @@ export function GlobalSearch() {
     setSelectedReport({ html, name: projectName });
   };
   
+  const hasCloud = !!store.cloudServerUrl;
+  
+  if (!profile) return null;
+  
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 max-w-3xl mx-auto w-full">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold tracking-tight">Global Search</h2>
         <p className="text-muted-foreground text-sm">
           Cari project berdasarkan Test ID, nama project, atau nama aplikasi.
+          {hasCloud && ' Pencarian juga dilakukan di cloud server.'}
         </p>
       </div>
       
@@ -115,75 +156,159 @@ export function GlobalSearch() {
         </Button>
       </div>
       
-      {/* Upload hint */}
+      {/* Info */}
       <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
         <span>
-          Klik &quot;Upload&quot; untuk upload file HTML report atau JSON project. 
-          Test ID akan otomatis diekstrak untuk pencarian lokal.
-          Untuk search online, host HTML report kamu di GitHub Pages / Netlify.
+          Klik &quot;Upload&quot; untuk upload file HTML/JSON, atau ketik langsung Test ID.
+          {hasCloud 
+            ? ' Hasil dari cloud server juga akan muncul otomatis.' 
+            : ' Untuk search cloud, konfigurasi server di Settings > Cloud.'}
         </span>
       </div>
       
       {/* Results */}
       {query.trim() && (
-        <div className="space-y-4">
-          <h3 className="font-medium text-sm text-muted-foreground">
-            Hasil pencarian untuk &quot;{query}&quot; — {localResults.length} ditemukan (lokal)
-          </h3>
-          
-          {localResults.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Search className="w-10 h-10 text-muted-foreground/30 mb-3" />
-                <h4 className="font-medium text-muted-foreground">Tidak ada hasil</h4>
-                <p className="text-sm text-muted-foreground/70 mt-1">
-                  Project dengan query &quot;{query}&quot; tidak ditemukan di data lokal kamu.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {localResults.map((project) => (
-                <Card key={project.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{project.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="font-mono text-[10px]">{project.testId}</Badge>
-                          <span className="text-xs text-muted-foreground">{project.applicationName}</span>
-                          <span className="text-xs text-muted-foreground">by {project.testerName}</span>
+        <div className="space-y-6">
+          {/* Local Results */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-sm text-muted-foreground">
+              Lokal — {localResults.length} ditemukan
+            </h3>
+            {localResults.length === 0 ? (
+              <p className="text-sm text-muted-foreground/70 pl-2">Tidak ditemukan di data lokal.</p>
+            ) : (
+              <div className="space-y-2">
+                {localResults.map((project) => (
+                  <Card key={project.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{project.name}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="font-mono text-[10px]">{project.testId}</Badge>
+                            <span className="text-xs text-muted-foreground">{project.applicationName}</span>
+                            <span className="text-xs text-muted-foreground">by {project.testerName}</span>
+                            <Badge variant="secondary" className="text-[10px]">Lokal</Badge>
+                          </div>
                         </div>
-                        {project.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{project.description}</p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            size="sm" variant="outline"
+                            onClick={() => store.navigate({ type: 'project', projectId: project.id })}
+                            className="gap-1.5"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            Open
+                          </Button>
+                          <Button 
+                            size="sm" variant="outline"
+                            onClick={() => handlePreviewReport(project.name)}
+                            className="gap-1.5"
+                          >
+                            <Globe className="w-3 h-3" />
+                            Preview
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => store.navigate({ type: 'project', projectId: project.id })}
-                          className="gap-1.5"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Open
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handlePreviewReport(project.name)}
-                          className="gap-1.5"
-                        >
-                          <Globe className="w-3 h-3" />
-                          Preview HTML
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Cloud Results */}
+          {hasCloud && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                  <Cloud className="w-4 h-4" />
+                  Cloud — {cloudSearching ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Mencari...
+                    </span>
+                  ) : cloudSearched ? (
+                    `${cloudResults.length} ditemukan`
+                  ) : (
+                    'Menunggu...'
+                  )}
+                </h3>
+                
+                {!cloudSearching && cloudMessage && cloudResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground/70 pl-2">{cloudMessage}</p>
+                )}
+                
+                {cloudResults.length > 0 && (
+                  <div className="space-y-2">
+                    {cloudResults.map((item, idx) => (
+                      <Card key={idx} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{item.projectName || 'Unnamed Project'}</p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <Badge variant="outline" className="font-mono text-[10px]">{item.testId}</Badge>
+                                <span className="text-xs text-muted-foreground">{item.applicationName || '-'}</span>
+                                {item.tester && <span className="text-xs text-muted-foreground">by {item.tester}</span>}
+                                <Badge variant="secondary" className="text-[10px]">Cloud</Badge>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                size="sm" variant="outline"
+                                onClick={() => window.open(`${store.cloudServerUrl}/api/download.php?id=${item.testId}&format=html`, '_blank')}
+                                className="gap-1.5"
+                              >
+                                <Globe className="w-3 h-3" />
+                                View Report
+                              </Button>
+                              <Button 
+                                size="sm" variant="outline"
+                                onClick={async () => {
+                                  const result = await store.downloadFromCloud(item.testId);
+                                  if (result.success && result.data) {
+                                    const jsonStr = JSON.stringify(result.data, null, 2);
+                                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${item.testId}.json`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                    toast.success('JSON berhasil didownload dari cloud!');
+                                  } else {
+                                    toast.error(result.message);
+                                  }
+                                }}
+                                className="gap-1.5"
+                              >
+                                <Download className="w-3 h-3" />
+                                Download
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          
+          {!hasCloud && (
+            <>
+              <Separator />
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <CloudOff className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">Cloud search tidak aktif</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Konfigurasi cloud server di Settings &gt; Cloud</p>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       )}
