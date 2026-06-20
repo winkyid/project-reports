@@ -258,7 +258,7 @@ export function GlobalSearch() {
                             <div className="flex items-center gap-2">
                               <Button 
                                 size="sm" variant="outline"
-                                onClick={() => window.open(`${store.cloudServerUrl}/api/download.php?id=${item.testId}&format=html`, '_blank')}
+                                onClick={() => window.open(`/api/cloud-proxy?action=download&id=${item.testId}`, '_blank')}
                                 className="gap-1.5"
                               >
                                 <Globe className="w-3 h-3" />

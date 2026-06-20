@@ -22,8 +22,11 @@ if (!validateApiKey()) {
     errorResponse('Invalid API key.', 401);
 }
 
+$testId = '';
+$jsonData = null;
+
 // Cek apakah multipart file upload atau raw JSON
-if (isset($_FILES['json_file']) && $_FILES['json_file']['error'] === UPLOAD_ERR_OK) {
+if (!empty($_FILES['json_file']) && $_FILES['json_file']['error'] === UPLOAD_ERR_OK) {
     $fileContent = file_get_contents($_FILES['json_file']['tmp_name']);
     $jsonData = json_decode($fileContent, true);
     
@@ -40,11 +43,10 @@ if (isset($_FILES['json_file']) && $_FILES['json_file']['error'] === UPLOAD_ERR_
     }
     
     if (empty($testId)) {
-        errorResponse('Test ID tidak ditemukan di file JSON. Tambahkan field "test_id" di form.');
+        errorResponse('Test ID tidak ditemukan di file JSON.');
     }
     
     $testId = strtoupper(preg_replace('/[^A-Za-z0-9\-]/', '', $testId));
-    
 } else {
     $input = getJsonInput();
     
@@ -61,30 +63,51 @@ if (isset($_FILES['json_file']) && $_FILES['json_file']['error'] === UPLOAD_ERR_
     $testId = strtoupper(preg_replace('/[^A-Za-z0-9\-]/', '', $testId));
 }
 
+// Validasi data
+if ($jsonData === null) {
+    errorResponse('Data JSON tidak valid.');
+}
+
 $safeFilename = preg_replace('/[^A-Za-z0-9\-]/', '', $testId);
 $filePath = DATA_DIR . '/' . $safeFilename . '.json';
 
-// Save file
-$saveData = [
+// Prepare save data
+$saveData = array(
     'testId' => $testId,
-    'uploadedAt' => date('Y-m-d\TH:i:s\Z'),
+    'uploadedAt' => date('c'),
     'version' => '1.0.0',
     'data' => $jsonData,
-];
+);
 
 // Jika data format ExportData, simpan langsung
 if (isset($jsonData['project']) && isset($jsonData['exportedBy'])) {
     $saveData = $jsonData;
-    $saveData['uploadedAt'] = date('Y-m-d\TH:i:s\Z');
+    $saveData['uploadedAt'] = date('c');
 }
 
-file_put_contents($filePath, json_encode($saveData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+// Encode ke JSON
+$jsonString = json_encode($saveData);
+if ($jsonString === false) {
+    errorResponse('Gagal meng-encode data ke JSON: ' . json_last_error_msg());
+}
+
+// Simpan file
+$writeResult = safeWriteFile($filePath, $jsonString);
+if (!$writeResult) {
+    if (DEBUG_MODE) {
+        errorResponse('Gagal menyimpan file. Path: ' . $filePath . '. Cek permission folder data/', 500);
+    } else {
+        errorResponse('Gagal menyimpan file ke server.', 500);
+    }
+}
 
 // Update index
 $indexPath = DATA_DIR . '/index.json';
-$index = [];
+$index = array();
 if (file_exists($indexPath)) {
-    $index = json_decode(file_get_contents($indexPath), true) ?: [];
+    $indexContent = file_get_contents($indexPath);
+    $index = json_decode($indexContent, true);
+    if (!is_array($index)) $index = array();
 }
 
 $projectName = '';
@@ -106,13 +129,13 @@ if (isset($saveData['exportedBy'])) {
     $testerName = $saveData['exportedBy'];
 }
 
-$entry = [
+$entry = array(
     'testId' => $testId,
     'projectName' => $projectName,
     'applicationName' => $appName,
     'tester' => $testerName,
-    'uploadedAt' => date('Y-m-d\TH:i:s\Z'),
-];
+    'uploadedAt' => date('c'),
+);
 
 $found = false;
 foreach ($index as &$item) {
@@ -128,11 +151,12 @@ if (!$found) {
     $index[] = $entry;
 }
 
-file_put_contents($indexPath, json_encode($index, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+$indexJson = json_encode($index, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+safeWriteFile($indexPath, $indexJson);
 
-jsonResponse([
+jsonResponse(array(
     'success' => true,
     'message' => 'Project berhasil di-upload ke cloud.',
     'testId' => $testId,
     'url' => BASE_URL . '/api/download.php?id=' . urlencode($testId),
-]);
+));

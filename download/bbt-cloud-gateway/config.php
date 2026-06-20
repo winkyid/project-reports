@@ -19,6 +19,9 @@ define('DATA_DIR', __DIR__ . '/data');
 // define('BASE_URL', 'https://yourdomain.com/bbt-gateway');
 define('BASE_URL', '');
 
+// Aktifkan error reporting untuk debugging (set false di production)
+define('DEBUG_MODE', true);
+
 // Aktifkan CORS untuk frontend yang di-host terpisah
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -32,7 +35,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Pastikan folder data ada
 if (!is_dir(DATA_DIR)) {
-    mkdir(DATA_DIR, 0755, true);
+    $mkdirResult = @mkdir(DATA_DIR, 0755, true);
+    if (!$mkdirResult && !is_dir(DATA_DIR)) {
+        if (DEBUG_MODE) {
+            jsonResponse(['success' => false, 'error' => 'Gagal membuat folder data. Path: ' . DATA_DIR . ', Permission issue?'], 500);
+        }
+        exit;
+    }
+}
+
+// Pastikan index.json ada
+$indexPath = DATA_DIR . '/index.json';
+if (!file_exists($indexPath)) {
+    @file_put_contents($indexPath, '[]');
 }
 
 // Fungsi validasi API Key
@@ -68,9 +83,29 @@ function errorResponse($message, $code = 400) {
 // Fungsi ambil input JSON dari request body
 function getJsonInput() {
     $raw = file_get_contents('php://input');
+    if (empty($raw)) {
+        errorResponse('Request body kosong.');
+    }
     $data = json_decode($raw, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
         errorResponse('Invalid JSON: ' . json_last_error_msg());
     }
     return $data;
+}
+
+// Fungsi tulis file yang aman (fallback jika file_put_contents gagal)
+function safeWriteFile($filePath, $content) {
+    // Method 1: file_put_contents
+    $result = @file_put_contents($filePath, $content);
+    if ($result !== false) return true;
+    
+    // Method 2: fopen + fwrite + fclose
+    $fp = @fopen($filePath, 'w');
+    if ($fp !== false) {
+        $written = @fwrite($fp, $content);
+        @fclose($fp);
+        if ($written !== false) return true;
+    }
+    
+    return false;
 }

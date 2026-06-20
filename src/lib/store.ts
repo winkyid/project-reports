@@ -26,6 +26,7 @@ function now(): string {
 // LocalStorage helpers
 const STORAGE_KEY = 'bbt-app-data';
 const CLOUD_CONFIG_KEY = 'bbt-cloud-config';
+const DEFAULT_CLOUD_URL = 'https://siakadumpr-tes.page.gd/bbt-cloud-gateway';
 
 function saveToStorage(profile: UserProfile | null) {
   if (typeof window !== 'undefined') {
@@ -56,13 +57,14 @@ function loadCloudConfig(): { url: string; key: string } {
     const data = localStorage.getItem(CLOUD_CONFIG_KEY);
     if (data) {
       try {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        return { url: parsed.url || DEFAULT_CLOUD_URL, key: parsed.key || '' };
       } catch {
-        return { url: '', key: '' };
+        return { url: DEFAULT_CLOUD_URL, key: '' };
       }
     }
   }
-  return { url: '', key: '' };
+  return { url: DEFAULT_CLOUD_URL, key: '' };
 }
 
 function saveCloudConfig(url: string, key: string) {
@@ -149,7 +151,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   currentProfile: null,
   isAuthenticated: false,
   currentView: { type: 'auth' },
-  cloudServerUrl: '',
+  cloudServerUrl: DEFAULT_CLOUD_URL,
   cloudApiKey: '',
   
   // ===== AUTH =====
@@ -227,12 +229,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     };
     
     try {
-      const response = await fetch(`${cloudServerUrl}/api/upload.php`, {
+      const response = await fetch('/api/cloud-proxy?action=upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(cloudApiKey ? { 'X-API-Key': cloudApiKey } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           testId: project.testId,
           data: exportData,
@@ -257,7 +256,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (!cloudServerUrl) return { success: false, message: 'Cloud Server URL belum diatur.' };
     
     try {
-      const response = await fetch(`${cloudServerUrl}/api/download.php?id=${encodeURIComponent(testId)}`);
+      const response = await fetch(`/api/cloud-proxy?action=download&id=${encodeURIComponent(testId)}`);
       const result = await response.json();
       
       if (result.success === false || result.error) {
@@ -279,7 +278,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (!query.trim()) return { success: true, results: [], message: '' };
     
     try {
-      const response = await fetch(`${cloudServerUrl}/api/search.php?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/cloud-proxy?action=search&q=${encodeURIComponent(query)}`);
       const result = await response.json();
       
       return {
@@ -300,11 +299,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (!cloudServerUrl) return { success: false, message: 'Cloud Server URL belum diatur.' };
     
     try {
-      const response = await fetch(`${cloudServerUrl}/api/delete.php?id=${encodeURIComponent(testId)}`, {
+      const response = await fetch(`/api/cloud-proxy?action=delete&id=${encodeURIComponent(testId)}`, {
         method: 'POST',
-        headers: {
-          ...(cloudApiKey ? { 'X-API-Key': cloudApiKey } : {}),
-        },
       });
       const result = await response.json();
       

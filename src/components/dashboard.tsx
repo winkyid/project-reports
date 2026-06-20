@@ -297,7 +297,7 @@ export function Dashboard() {
                             Upload ke Cloud
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
-                            window.open(`${cloudServerUrl}/api/download.php?id=${project.testId}&format=html`, '_blank');
+                            window.open(`/api/cloud-proxy?action=download&id=${project.testId}`, '_blank');
                           }}>
                             <Cloud className="mr-2 h-4 w-4" />
                             Lihat di Cloud
