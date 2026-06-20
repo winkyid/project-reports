@@ -507,22 +507,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
           'not-tested': '#6b7280', skip: '#3b82f6'
         }[tc.status] || '#6b7280';
         const statusLabel = {
-          pass: 'PASS', fail: 'FAIL', blocked: 'BLOCKED',
-          'not-tested': 'NOT TESTED', skip: 'SKIP'
-        }[tc.status] || 'NOT TESTED';
+          pass: 'LULUS', fail: 'GAGAL', blocked: 'DIBLOKIR',
+          'not-tested': 'BELUM UJI', skip: 'LEWATI'
+        }[tc.status] || 'BELUM UJI';
         
         return `
           <tr>
-            <td>${tc.no}</td>
-            <td>${tc.moduleName || '-'}</td>
-            <td>${tc.testScenario || '-'}</td>
-            <td>${tc.precondition || '-'}</td>
-            <td style="white-space: pre-line">${tc.testSteps || '-'}</td>
-            <td>${tc.expectedBehavior || '-'}</td>
-            <td>${tc.actualBehavior || '-'}</td>
+            <td style="text-align:center;font-family:monospace;font-weight:600">${tc.no}</td>
+            <td style="white-space:pre-line">${tc.testScenario || '-'}</td>
+            <td style="white-space:pre-line">${tc.testSteps || '-'}</td>
+            <td style="white-space:pre-line">${tc.expectedBehavior || '-'}</td>
+            <td style="white-space:pre-line">${tc.actualBehavior || '-'}</td>
             <td><span style="color:${statusColor};font-weight:600">${statusLabel}</span></td>
-            <td>${tc.bugId || '-'}</td>
-            <td>${tc.notes || '-'}</td>
           </tr>`;
       }).join('');
       
@@ -535,16 +531,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
             <table>
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>Module</th>
-                  <th>Test Scenario</th>
-                  <th>Precondition</th>
-                  <th>Test Steps</th>
-                  <th>Expected Behavior</th>
-                  <th>Actual Behavior</th>
+                  <th>Kode Uji</th>
+                  <th>Detail Skenario</th>
+                  <th>Data Uji</th>
+                  <th>Ekspektasi</th>
+                  <th>Hasil Aktual</th>
                   <th>Status</th>
-                  <th>Bug ID</th>
-                  <th>Notes</th>
                 </tr>
               </thead>
               <tbody>${testCasesHtml}</tbody>
@@ -605,10 +597,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     </div>
     
     <div class="summary-cards">
-      <div class="summary-card pass"><div class="value">${passCount}</div><div class="label">Passed</div></div>
-      <div class="summary-card fail"><div class="value">${failCount}</div><div class="label">Failed</div></div>
-      <div class="summary-card"><div class="value">${totalCases}</div><div class="label">Total Cases</div></div>
-      <div class="summary-card rate"><div class="value">${passRate}%</div><div class="label">Pass Rate</div></div>
+      <div class="summary-card pass"><div class="value">${passCount}</div><div class="label">Lulus</div></div>
+      <div class="summary-card fail"><div class="value">${failCount}</div><div class="label">Gagal</div></div>
+      <div class="summary-card"><div class="value">${totalCases}</div><div class="label">Total Kasus Uji</div></div>
+      <div class="summary-card rate"><div class="value">${passRate}%</div><div class="label">Tingkat Kelulusan</div></div>
     </div>
     
     ${categoriesHtml}

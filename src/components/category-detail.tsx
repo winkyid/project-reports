@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/lib/store';
-import { Category, TestCase, TestStatus, Priority, STATUS_CONFIG, PRIORITY_CONFIG } from '@/lib/types';
+import { Category, TestCase, TestStatus, STATUS_CONFIG } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,11 +22,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Plus, Trash2, Pencil, MoreVertical, ChevronUp, ChevronDown,
-  Save, X, AlertCircle, Table2, GripVertical 
+  Save, X, Table2 
 } from 'lucide-react';
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator 
@@ -136,36 +135,15 @@ export function CategoryDetail({ projectId, categoryId }: CategoryDetailProps) {
   
   const stats = getStats();
   
-  const renderCell = (label: string, value: string | undefined, fieldName: keyof TestCase) => {
+  const renderCell = (label: string, value: string | undefined, fieldName: keyof TestCase, rows = 2) => {
     if (editingId) {
-      if (fieldName === 'testSteps') {
-        return (
-          <Textarea
-            value={(editForm[fieldName] as string) || ''}
-            onChange={(e) => setEditForm(prev => ({ ...prev, [fieldName]: e.target.value }))}
-            rows={3}
-            className="min-w-[200px] text-sm"
-            placeholder={`Enter ${label.toLowerCase()}...`}
-          />
-        );
-      }
-      if (fieldName === 'precondition' || fieldName === 'expectedBehavior' || fieldName === 'actualBehavior' || fieldName === 'notes') {
-        return (
-          <Textarea
-            value={(editForm[fieldName] as string) || ''}
-            onChange={(e) => setEditForm(prev => ({ ...prev, [fieldName]: e.target.value }))}
-            rows={2}
-            className="min-w-[150px] text-sm"
-            placeholder={`Enter ${label.toLowerCase()}...`}
-          />
-        );
-      }
       return (
-        <Input
+        <Textarea
           value={(editForm[fieldName] as string) || ''}
           onChange={(e) => setEditForm(prev => ({ ...prev, [fieldName]: e.target.value }))}
-          className="min-w-[120px] text-sm"
-          placeholder={`Enter ${label.toLowerCase()}...`}
+          rows={rows}
+          className="min-w-[150px] text-sm"
+          placeholder={label}
         />
       );
     }
@@ -183,7 +161,7 @@ export function CategoryDetail({ projectId, categoryId }: CategoryDetailProps) {
           value={editForm.status || testCase.status}
           onValueChange={(v) => setEditForm(prev => ({ ...prev, status: v as TestStatus }))}
         >
-          <SelectTrigger className="w-[120px] h-8 text-xs">
+          <SelectTrigger className="w-[110px] h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -222,34 +200,6 @@ export function CategoryDetail({ projectId, categoryId }: CategoryDetailProps) {
           })}
         </DropdownMenuContent>
       </DropdownMenu>
-    );
-  };
-  
-  const renderPriorityBadge = (testCase: TestCase) => {
-    const config = PRIORITY_CONFIG[testCase.priority];
-    
-    if (editingId === testCase.id) {
-      return (
-        <Select
-          value={editForm.priority || testCase.priority}
-          onValueChange={(v) => setEditForm(prev => ({ ...prev, priority: v as Priority }))}
-        >
-          <SelectTrigger className="w-[100px] h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="high"><span className="text-red-600">High</span></SelectItem>
-            <SelectItem value="medium"><span className="text-amber-600">Medium</span></SelectItem>
-            <SelectItem value="low"><span className="text-blue-600">Low</span></SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    }
-    
-    return (
-      <Badge variant="outline" className={`text-xs ${config.color}`}>
-        {config.label}
-      </Badge>
     );
   };
   
@@ -373,50 +323,29 @@ export function CategoryDetail({ projectId, categoryId }: CategoryDetailProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px] text-center">No</TableHead>
-                  <TableHead className="min-w-[100px]">Module</TableHead>
-                  <TableHead className="min-w-[140px]">Test Scenario</TableHead>
-                  <TableHead className="min-w-[120px]">Precondition</TableHead>
-                  <TableHead className="min-w-[180px]">Test Steps</TableHead>
-                  <TableHead className="min-w-[120px]">Expected</TableHead>
-                  <TableHead className="min-w-[120px]">Actual</TableHead>
+                  <TableHead className="w-[70px] text-center">Kode Uji</TableHead>
+                  <TableHead className="min-w-[200px]">Detail Skenario</TableHead>
+                  <TableHead className="min-w-[200px]">Data Uji</TableHead>
+                  <TableHead className="min-w-[160px]">Ekspektasi</TableHead>
+                  <TableHead className="min-w-[160px]">Hasil Aktual</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[80px]">Priority</TableHead>
-                  <TableHead className="w-[100px]">Bug ID</TableHead>
-                  <TableHead className="min-w-[100px]">Notes</TableHead>
-                  <TableHead className="w-[60px]">Actions</TableHead>
+                  <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {category.testCases.map((testCase, index) => (
                   <TableRow key={testCase.id} className={editingId === testCase.id ? 'bg-muted/30' : ''}>
-                    <TableCell className="text-center font-mono text-sm">{testCase.no}</TableCell>
-                    <TableCell>{renderCell('Module', testCase.moduleName, 'moduleName')}</TableCell>
-                    <TableCell>{renderCell('Test Scenario', testCase.testScenario, 'testScenario')}</TableCell>
-                    <TableCell>{renderCell('Precondition', testCase.precondition, 'precondition')}</TableCell>
-                    <TableCell>{renderCell('Test Steps', testCase.testSteps, 'testSteps')}</TableCell>
-                    <TableCell>{renderCell('Expected Behavior', testCase.expectedBehavior, 'expectedBehavior')}</TableCell>
-                    <TableCell>{renderCell('Actual Behavior', testCase.actualBehavior, 'actualBehavior')}</TableCell>
+                    <TableCell className="text-center font-mono text-sm font-medium">{testCase.no}</TableCell>
+                    <TableCell>{renderCell('Detail Skenario', testCase.testScenario, 'testScenario', 3)}</TableCell>
+                    <TableCell>{renderCell('Data Uji', testCase.testSteps, 'testSteps', 3)}</TableCell>
+                    <TableCell>{renderCell('Ekspektasi', testCase.expectedBehavior, 'expectedBehavior')}</TableCell>
+                    <TableCell>{renderCell('Hasil Aktual', testCase.actualBehavior, 'actualBehavior')}</TableCell>
                     <TableCell>{renderStatusBadge(testCase)}</TableCell>
-                    <TableCell>{renderPriorityBadge(testCase)}</TableCell>
-                    <TableCell>
-                      {editingId === testCase.id ? (
-                        <Input
-                          value={(editForm.bugId as string) || ''}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, bugId: e.target.value }))}
-                          className="min-w-[80px] text-sm"
-                          placeholder="Bug ID"
-                        />
-                      ) : (
-                        <span className="text-sm font-mono">{testCase.bugId || <span className="text-muted-foreground/40">-</span>}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{renderCell('Notes', testCase.notes, 'notes')}</TableCell>
                     <TableCell>
                       {editingId ? (
                         <span className="text-xs text-muted-foreground">...</span>
                       ) : (
-                        <div className="flex items-center gap-0.5">
+                        <div className="flex items-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -430,16 +359,16 @@ export function CategoryDetail({ projectId, categoryId }: CategoryDetailProps) {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleMoveUp(index)} disabled={index === 0}>
                                 <ChevronUp className="mr-2 h-3.5 w-3.5" />
-                                Move Up
+                                Pindah Atas
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleMoveDown(index)} disabled={index === category.testCases.length - 1}>
                                 <ChevronDown className="mr-2 h-3.5 w-3.5" />
-                                Move Down
+                                Pindah Bawah
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setShowDeleteDialog(testCase.id)}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                Delete
+                                Hapus
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

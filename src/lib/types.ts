@@ -80,11 +80,11 @@ export interface ExportData {
 
 // Status color mapping
 export const STATUS_CONFIG: Record<TestStatus, { label: string; color: string; bgColor: string }> = {
-  pass: { label: 'Pass', color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800' },
-  fail: { label: 'Fail', color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800' },
-  blocked: { label: 'Blocked', color: 'text-amber-700 dark:text-amber-400', bgColor: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' },
-  'not-tested': { label: 'Not Tested', color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700' },
-  skip: { label: 'Skip', color: 'text-blue-700 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800' },
+  pass: { label: 'Lulus', color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800' },
+  fail: { label: 'Gagal', color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800' },
+  blocked: { label: 'Diblokir', color: 'text-amber-700 dark:text-amber-400', bgColor: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' },
+  'not-tested': { label: 'Belum Uji', color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700' },
+  skip: { label: 'Lewati', color: 'text-blue-700 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800' },
 };
 
 export const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
